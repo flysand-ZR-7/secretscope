@@ -1,0 +1,13 @@
+services:
+  secretscope:
+    build: .
+    container_name: secretscope
+    ports:
+      - "8077:8077"
+    environment:
+      - SECRETSCOPE_PORT=8077
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    volumes:
+      - ./secretscope.db:/app/secretscope.db
+      - ./scope.txt:/app/scope.txt
+    restart: unless-stopped

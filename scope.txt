@@ -1,0 +1,2 @@
+# SecretScope — Allowed target domains (one per line, supports *.example.com wildcards)
+# Add your authorized domains below before scanning.

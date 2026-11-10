@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecretScope — Bug Bounty Recon</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--text-dim:#8b949e;--accent:#00e5ff;--accent2:#39d353;--critical:#ff4444;--high:#ff8c00;--medium:#ffd700;--low:#4488ff;--hover:#1f2937}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  a{color:var(--accent);text-decoration:none}
+  button{cursor:pointer;border:none;font-family:inherit;font-size:.85rem;padding:.5rem 1rem;border-radius:6px;font-weight:600;transition:all .2s}
+  input[type=text]{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.55rem .75rem;border-radius:6px;font-size:.9rem;outline:none;transition:border .2s}
+  input[type=text]:focus{border-color:var(--accent)}
+  /* Header */
+  .header{background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);border-bottom:1px solid var(--border);padding:1.25rem 2rem;display:flex;align-items:center;gap:1rem}
+  .header h1{font-size:1.6rem;color:#fff;letter-spacing:-.5px}
+  .header h1 span{color:var(--accent)}
+  .header p{color:var(--text-dim);font-size:.85rem}
+  /* Layout */
+  .container{max-width:1400px;margin:0 auto;padding:1.5rem}
+  /* Scope */
+  .scope-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+  .scope-bar label{font-weight:600;font-size:.85rem;color:var(--accent2);white-space:nowrap}
+  .scope-bar input{flex:1;min-width:200px}
+  .scope-bar .btn-scope{background:var(--accent2);color:#000}
+  .scope-bar .btn-scope:hover{opacity:.85}
+  .scope-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-left:.5rem}
+  .scope-tag{background:#1a2e1a;color:var(--accent2);border:1px solid #2a4a2a;padding:.25rem .65rem;border-radius:20px;font-size:.78rem;display:flex;align-items:center;gap:.35rem}
+  .scope-tag .remove{cursor:pointer;opacity:.7;font-size:.9rem}
+  .scope-tag .remove:hover{opacity:1;color:var(--critical)}
+  /* Cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1.5rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;transition:border-color .2s}
+  .card:hover{border-color:var(--accent)}
+  .card h3{font-size:1rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+  .card .card-row{display:flex;gap:.5rem}
+  .card .card-row input{flex:1}
+  .card .btn-scan{background:var(--accent);color:#000}
+  .card .btn-scan:hover{background:#00bcd4}
+  /* Status */
+  .status-bar{min-height:2.2rem;display:flex;align-items:center;justify-content:center;gap:.75rem;margin-bottom:1rem}
+  .spinner{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .status-msg{font-size:.85rem;padding:.4rem .85rem;border-radius:6px;display:none}
+  .status-msg.error{display:inline-block;background:#2d1111;color:var(--critical);border:1px solid #5a1a1a}
+  .status-msg.success{display:inline-block;background:#112d11;color:var(--accent2);border:1px solid #1a5a1a}
+  .status-msg.info{display:inline-block;background:#111a2d;color:var(--accent);border:1px solid #1a2a5a}
+  /* Main grid: results + history */
+  .main-grid{display:grid;grid-template-columns:1fr 320px;gap:1.25rem}
+  @media(max-width:900px){.main-grid{grid-template-columns:1fr}}
+  /* Results */
+  .results-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;overflow-x:auto}
+  .results-panel h3{margin-bottom:.75rem;font-size:1rem}
+  .results-table{width:100%;border-collapse:collapse;font-size:.82rem}
+  .results-table th{text-align:left;padding:.55rem .5rem;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px}
+  .results-table td{padding:.5rem;border-bottom:1px solid var(--border);vertical-align:middle}
+  .results-table tr:hover td{background:var(--hover)}
+  .badge{padding:.2rem .55rem;border-radius:12px;font-size:.7rem;font-weight:700;text-transform:uppercase;display:inline-block}
+  .badge-critical{background:#3a1111;color:var(--critical);border:1px solid var(--critical)}
+  .badge-high{background:#3a2511;color:var(--high);border:1px solid var(--high)}
+  .badge-medium{background:#3a3511;color:var(--medium);border:1px solid var(--medium)}
+  .badge-low{background:#112244;color:var(--low);border:1px solid var(--low)}
+  .mono{font-family:'Cascadia Code','Fira Code',monospace;font-size:.78rem;color:var(--accent);word-break:break-all}
+  .src-url{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;color:var(--text-dim);font-size:.78rem}
+  .btn-copy{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:.15rem .4rem;font-size:.7rem;border-radius:4px;margin-left:.3rem}
+  .btn-copy:hover{border-color:var(--accent);color:var(--accent)}
+  .empty-state{text-align:center;padding:3rem 1rem;color:var(--text-dim)}
+  .empty-state .icon{font-size:2.5rem;margin-bottom:.75rem}
+  /* History */
+  .history-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem}
+  .history-panel h3{margin-bottom:.75rem;font-size:1rem;display:flex;align-items:center;gap:.4rem}
+  .history-list{list-style:none;max-height:500px;overflow-y:auto}
+  .history-item{padding:.6rem .7rem;border-radius:6px;cursor:pointer;margin-bottom:.3rem;border:1px solid transparent;transition:all .15s}
+  .history-item:hover{background:var(--hover);border-color:var(--border)}
+  .history-item.active{border-color:var(--accent);background:#0a1929}
+  .history-item .hi-top{display:flex;justify-content:space-between;font-size:.82rem;font-weight:600}
+  .history-item .hi-bottom{font-size:.72rem;color:var(--text-dim);margin-top:.2rem;display:flex;justify-content:space-between}
+  .hi-type{padding:.1rem .4rem;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+  .hi-type-url{background:#0a1929;color:var(--accent)}
+  .hi-type-domain{background:#112d11;color:var(--accent2)}
+  .hi-type-github{background:#2d1a2d;color:#da70d6}
+  .count-badge{background:var(--bg);padding:.1rem .45rem;border-radius:10px;font-size:.72rem;color:var(--text-dim);border:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🔍 Secret<span>Scope</span></h1>
+    <p>Bug Bounty Recon — Secret &amp; API Key Scanner</p>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Scope Management -->
+  <div class="scope-bar">
+    <label>🎯 Scope:</label>
+    <input type="text" id="scopeInput" placeholder="example.com">
+    <button class="btn-scope" onclick="addScope()">Add to Scope</button>
+    <div class="scope-tags" id="scopeTags"></div>
+  </div>
+
+  <!-- Scan Cards -->
+  <div class="cards">
+    <div class="card">
+      <h3>🌐 Scan URL</h3>
+      <div class="card-row">
+        <input type="text" id="urlInput" placeholder="https://example.com/app.js">
+        <button class="btn-scan" onclick="scanURL()">Scan</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🔎 Scan Domain</h3>
+      <div class="card-row">
+        <input type="text" id="domainInput" placeholder="example.com">
+        <button class="btn-scan" onclick="scanDomain()">Scan</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🐙 GitHub Search</h3>
+      <div class="card-row">
+        <input type="text" id="githubInput" placeholder="example.com">
+        <button class="btn-scan" onclick="scanGitHub()">Scan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="spinner" id="spinner"></div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-grid">
+    <div class="results-panel">
+      <h3>📋 Findings <span id="findingCount" class="count-badge" style="display:none"></span></h3>
+      <div id="resultsBody">
+        <div class="empty-state">
+          <div class="icon">🛡️</div>
+          <p>No findings yet. Add a domain to scope and start scanning.</p>
+        </div>
+      </div>
+    </div>
+    <div class="history-panel">
+      <h3>📜 Scan History</h3>
+      <ul class="history-list" id="historyList">
+        <li class="empty-state" style="padding:1.5rem .5rem"><div class="icon">📂</div><p>No scans yet</p></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// ── Status helpers ──────────────────────────────────────
+function showSpinner(){ $('spinner').style.display='block'; clearStatus(); }
+function hideSpinner(){ $('spinner').style.display='none'; }
+function showStatus(msg, type='info'){
+  const el=$('statusMsg'); el.textContent=msg; el.className='status-msg '+type; hideSpinner();
+}
+function clearStatus(){ const el=$('statusMsg'); el.className='status-msg'; el.textContent=''; }
+
+async function api(method, url, body){
+  const opts = {method, headers:{'Content-Type':'application/json'}};
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  return data;
+}
+
+// ── Scope ───────────────────────────────────────────────
+let scopeDomains = [];
+
+async function loadScope(){
+  try{
+    const data = await api('GET','/api/scope');
+    scopeDomains = data.domains || [];
+    renderScope();
+  }catch(e){ /* silent on first load */ }
+}
+
+function renderScope(){
+  const el=$('scopeTags'); el.innerHTML='';
+  scopeDomains.forEach(d=>{
+    const tag=document.createElement('span'); tag.className='scope-tag';
+    tag.innerHTML=`${esc(d)} <span class="remove" onclick="removeScope('${esc(d)}')">&times;</span>`;
+    el.appendChild(tag);
+  });
+}
+
+async function addScope(){
+  const v=$('scopeInput').value.trim(); if(!v) return;
+  try{
+    showSpinner();
+    const data=await api('POST','/api/scope/add',{domain:v});
+    scopeDomains=data.domains||[];
+    renderScope(); $('scopeInput').value='';
+    showStatus(`Added "${v}" to scope`,'success');
+  }catch(e){ showStatus(e.message,'error'); }
+}
+
+async function removeScope(domain){
+  const updated=scopeDomains.filter(d=>d!==domain);
+  try{
+    const data=await api('POST','/api/scope',{domains:updated});
+    scopeDomains=data.domains||[];
+    renderScope();
+  }catch(e){ showStatus(e.message,'error'); }
+}
+
+// ── Scans ───────────────────────────────────────────────
+async function scanURL(){
+  const v=$('urlInput').value.trim(); if(!v) return;
+  try{ showSpinner(); showStatus('Scanning URL…','info');
+    const r=await api('POST','/api/scan/url',{url:v});
+    renderResults(r); loadHistory();
+    showStatus(`Scan complete — ${(r.findings||[]).length} finding(s)`,'success');
+  }catch(e){ showStatus(e.message,'error'); }
+}
+
+async function scanDomain(){
+  const v=$('domainInput').value.trim(); if(!v) return;
+  try{ showSpinner(); showStatus('Running domain recon… this may take a while','info');
+    const r=await api('POST','/api/scan/domain',{domain:v});
+    renderResults(r); loadHistory();
+    showStatus(`Domain scan complete — ${(r.findings||[]).length} finding(s)`,'success');
+  }catch(e){ showStatus(e.message,'error'); }
+}
+
+async function scanGitHub(){
+  const v=$('githubInput').value.trim(); if(!v) return;
+  try{ showSpinner(); showStatus('Searching GitHub…','info');
+    const r=await api('POST','/api/scan/github',{domain:v});
+    renderResults(r); loadHistory();
+    showStatus(`GitHub scan complete — ${(r.findings||[]).length} finding(s)`,'success');
+  }catch(e){ showStatus(e.message,'error'); }
+}
+
+// ── Results rendering ───────────────────────────────────
+const sevEmoji={critical:'🔴',high:'🟠',medium:'🟡',low:'🔵'};
+
+function renderResults(scan){
+  const findings = scan.findings || [];
+  const fc=$('findingCount');
+  if(!findings.length){
+    $('resultsBody').innerHTML='<div class="empty-state"><div class="icon">✅</div><p>No secrets found in this scan.</p></div>';
+    fc.style.display='none'; return;
+  }
+  fc.textContent=findings.length+' found'; fc.style.display='inline';
+  let html=`<table class="results-table"><thead><tr>
+    <th>Severity</th><th>Type</th><th>Redacted Value</th><th>Source URL</th><th>Line</th>
+  </tr></thead><tbody>`;
+  findings.forEach(f=>{
+    const sev=(f.severity||'low').toLowerCase();
+    const emoji=sevEmoji[sev]||'🔵';
+    html+=`<tr>
+      <td>${emoji} <span class="badge badge-${sev}">${sev}</span></td>
+      <td>${esc(f.pattern_name||'—')}</td>
+      <td class="mono">${esc(f.redacted_value||'—')}</td>
+      <td><span class="src-url" title="${esc(f.url||'')}">${esc(f.url||'—')}</span>
+        <button class="btn-copy" onclick="copyText('${esc(f.url||'')}')">📋</button></td>
+      <td>${f.line_number||'—'}</td>
+    </tr>`;
+  });
+  html+='</tbody></table>';
+  $('resultsBody').innerHTML=html;
+}
+
+// ── History ─────────────────────────────────────────────
+let activeHistoryId=null;
+
+async function loadHistory(){
+  try{
+    const scans=await api('GET','/api/scans');
+    const list=$('historyList'); list.innerHTML='';
+    if(!scans.length){ list.innerHTML='<li class="empty-state" style="padding:1.5rem .5rem"><div class="icon">📂</div><p>No scans yet</p></li>'; return; }
+    scans.forEach(s=>{
+      const li=document.createElement('li');
+      li.className='history-item'+(s.id===activeHistoryId?' active':'');
+      const typeClass='hi-type-'+(s.scan_type||'url');
+      const count=(s.finding_count!=null)?s.finding_count:((s.findings||[]).length);
+      const time=s.timestamp?new Date(s.timestamp).toLocaleString():'';
+      li.innerHTML=`<div class="hi-top"><span>${esc(s.target||'—')}</span><span class="count-badge">${count} finding(s)</span></div>
+        <div class="hi-bottom"><span class="hi-type ${typeClass}">${s.scan_type||'?'}</span><span>${time}</span></div>`;
+      li.onclick=()=>loadScan(s.id, li);
+      list.appendChild(li);
+    });
+  }catch(e){ /* silent */ }
+}
+
+async function loadScan(id, el){
+  try{
+    showSpinner(); activeHistoryId=id;
+    document.querySelectorAll('.history-item').forEach(i=>i.classList.remove('active'));
+    if(el) el.classList.add('active');
+    const scan=await api('GET',`/api/scans/${id}`);
+    renderResults(scan);
+    hideSpinner();
+  }catch(e){ showStatus(e.message,'error'); }
+}
+
+// ── Utilities ───────────────────────────────────────────
+function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function copyText(t){ navigator.clipboard.writeText(t).then(()=>showStatus('Copied!','success')).catch(()=>{}); }
+
+// Enter-key support
+['scopeInput','urlInput','domainInput','githubInput'].forEach(id=>{
+  const el=$(id); if(el) el.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      if(id==='scopeInput') addScope();
+      else if(id==='urlInput') scanURL();
+      else if(id==='domainInput') scanDomain();
+      else if(id==='githubInput') scanGitHub();
+    }
+  });
+});
+
+// Initial load
+loadScope();
+loadHistory();
+</script>
+</body>
+</html>
