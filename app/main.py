@@ -8,13 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from app.models import ScanTarget, ScanResult, Finding, ScopeUpdate
+from app.models import ScanTarget, ScanResult, Finding, ScopeUpdate, ReconTarget, ReconResult
 from app.storage import init_db, save_scan, get_scans, get_scan
 from app.scope import scope_manager
 from app.scanners.engine import scan_content, scan_urls
 from app.scanners.discovery import wayback_urls, extract_js_urls, interesting_paths
 from app.scanners.fetcher import fetch_url
 from app.scanners.github_search import GitHubDorkScanner
+from app.scanners.recon import perform_full_recon
 
 logging.basicConfig(
     level=logging.INFO,
@@ -141,6 +142,20 @@ async def scan_github(target: ScanTarget):
     result = save_scan(target=target.domain, scan_type="github", findings=findings)
     logger.info(f"GitHub scan complete: {len(findings)} finding(s)")
     return result
+
+
+@app.post("/api/recon", response_model=ReconResult)
+async def recon_domain(target: ReconTarget):
+    """
+    Perform OSINT reconnaissance (crt.sh Certificate Transparency),
+    security header audit (OnionScan/Recon-ng), and Ahmia Dark Web leak lookup.
+    """
+    if not target.domain:
+        raise HTTPException(status_code=400, detail="domain is required")
+
+    logger.info(f"Starting OSINT recon & dark web breach lookup: {target.domain}")
+    recon_data = await perform_full_recon(target.domain)
+    return ReconResult(**recon_data)
 
 
 # ── History Endpoints ─────────────────────────────────────────────

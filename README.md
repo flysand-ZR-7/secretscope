@@ -1,6 +1,13 @@
 # 🔍 SecretScope
 
-**SecretScope** is a fast, local-first bug bounty reconnaissance and secret-detection framework — inspired by tools like MobSF, TruffleHog, and Gitleaks. It features a browser-based dashboard, async URL recon via Wayback Machine CDX API, regex + Shannon entropy filtering, safe token validation, and scope protection.
+[![CI](https://github.com/flysand-ZR-7/secretscope/actions/workflows/ci.yml/badge.svg)](https://github.com/flysand-ZR-7/secretscope/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Tests](https://img.shields.io/badge/Tests-5%20Passed-brightgreen.svg)](tests/)
+
+**SecretScope** is a fast, local-first bug bounty reconnaissance, OSINT intelligence, and secret-detection framework — inspired by tools like TruffleHog, Recon-ng, OnionScan, and Gitleaks. It features a browser-based dashboard, async URL recon via Wayback Machine, passive Certificate Transparency subdomain discovery, security header misconfiguration audits, Ahmia Dark Web leak queries, regex + Shannon entropy filtering, and scope protection.
 
 ---
 
@@ -55,7 +62,18 @@ Access the web dashboard in your browser:
    - Crawls target homepage and extracts script sources (`<script src="...">`).
    - High-signal filtering on sensitive extensions (`.env`, `.json`, `.config`, `.yml`, `.sql`, `.bak`, etc.) and sensitive paths (`/api/`, `/admin/`, `/backup/`, `/.git/`, etc.).
 
-4. **GitHub Code Search**:
+4. **OSINT Reconnaissance (Inspired by Recon-ng)**:
+   - Passive Certificate Transparency log queries via `crt.sh/?q=%.domain&output=json` to uncover hidden subdomains (`api`, `dev`, `staging`, `vpn`) without triggering defensive alerts or IDS.
+
+5. **Security Header & Information Disclosure Audits (Inspired by OnionScan)**:
+   - Automated inspection for missing `Content-Security-Policy` (CSP) and `Strict-Transport-Security` (HSTS).
+   - Flags dangerous wildcard CORS configurations (`Access-Control-Allow-Origin: *`).
+   - Identifies technology disclosures in `X-Powered-By` and granular server version banners.
+
+6. **Ahmia Dark Web Threat Intelligence (Inspired by Ahmia & TorBot)**:
+   - Automatically queries Ahmia indexers for target domain references in Tor breach dumps, paste sites, and underground forums.
+
+7. **GitHub Code Search**:
    - Runs 20+ targeted dorks against the GitHub Code Search API using `GITHUB_TOKEN`.
    - Handles rate-limiting with exponential backoff and 2.2s query delays.
 

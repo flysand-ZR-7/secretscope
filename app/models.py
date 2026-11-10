@@ -31,3 +31,17 @@ class ScanResult(BaseModel):
 
 class ScopeUpdate(BaseModel):
     domains: list[str]
+
+
+class ReconTarget(BaseModel):
+    domain: str
+
+
+class ReconResult(BaseModel):
+    domain: str
+    target_url: str
+    subdomain_count: int
+    subdomains: list[str] = []
+    header_issues: list[dict] = []
+    darkweb_mentions_count: int = 0
+    darkweb_mentions: list[dict] = []
